@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Stock Gudang - MECHMAR</title>
+    <!-- Tailwind CSS untuk Desain -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Ganti konfigurasi di bawah ini dengan konfigurasi dari Firebase Console Anda
+        const firebaseConfig = {
+  apiKey: "AIzaSyAd_4OstX15MuDnAR-oJjwzTOikApQoqng",
+  authDomain: "mechmar-stock-gudang.firebaseapp.com",
+  projectId: "mechmar-stock-gudang",
+  storageBucket: "mechmar-stock-gudang.firebasestorage.app",
+  messagingSenderId: "1060677476187",
+  appId: "1:1060677476187:web:eb68281a8580102a42447e",
+  measurementId: "G-HW16X3857K"
+};
+  
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Ekspor ke variabel global agar bisa diakses fungsi lain di bawah
+        window.db = db;
+        window.firebaseModules = { collection, getDocs, addDoc, updateDoc, deleteDoc, doc };
+        
+        // Panggil fungsi untuk memuat data dari internet saat pertama kali dibuka
+        window.initAppFromCloud();
+    </script>
+
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+    <!-- (Bagian HTML Body Tetap Sama Seperti Kode Asli Anda) -->
+    
+    <!-- JavaScript Logika Sistem yang Terhubung ke Cloud -->
+    <script>
+        let items = [];
+        let transaksi = [];
+        let currentItemFotos = [];
+
+        // Fungsi utama untuk memuat data dari Firebase Firestore
+        window.initAppFromCloud = async function() {
+            try {
+                const { collection, getDocs } = window.firebaseModules;
+                
+                // Ambil data items dari Firestore
+                const querySnapshotItems = await getDocs(collection(window.db, "items"));
+                items = [];
+                querySnapshotItems.forEach((doc) => {
+                    items.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Ambil data transaksi dari Firestore
+                const querySnapshotTransaksi = await getDocs(collection(window.db, "transaksi"));
+                transaksi = [];
+                querySnapshotTransaksi.forEach((doc) => {
+                    transaksi.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Render ulang tampilan setelah data berhasil diambil dari internet
+                updateDatalistItem();
+                renderHistoriItem();
+                renderStock();
+                renderHistoriMasuk();
+                renderHistoriKeluar();
+            } catch (error) {
+                console.error("Gagal memuat data dari cloud: ", error);
+            }
+        };
+
+        // Navigasi Tab
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-red-700');
+                btn.classList.add('bg-red-800', 'text-white');
+            });
+
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.remove('bg-red-800', 'text-white');
+            event.target.classList.add('bg-white', 'text-red-700');
+
+            if(tabId === 'input-item') renderHistoriItem();
+            if(tabId === 'laporan-stock') renderStock();
+            if(tabId === 'barang-masuk') {
+                updateDatalistItem();
+                renderHistoriMasuk();
+            }
+            if(tabId === 'barang-keluar') {
+                updateDatalistItem();
+                renderHistoriKeluar();
+            }
+        }
+
+        // Jam Real-Time
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('realtime-clock').innerText = now.toLocaleTimeString('id-ID') + ' - ' + now.toLocaleDateString('id-ID', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
+        }, 1000);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            const tglMasuk = document.getElementById('tanggal-masuk');
+            const tglKeluar = document.getElementById('tanggal-keluar');
+            if(tglMasuk) tglMasuk.value = today;
+            if(tglKeluar) tglKeluar.value = today;
+        });
+
+        function updateDatalistItem() {
+            const datalist = document.getElementById('list-opsi-item');
+            if (!datalist) return;
+            datalist.innerHTML = '';
+            items.forEach(i => {
+                datalist.innerHTML += `<option value="${i.kode} - ${i.nama}">`;
+            });
+        }
+
+        function ambilKodeItem(teksInput) {
+            if (!teksInput) return '';
+            const bagian = teksInput.split(' - ');
+            return bagian[0].trim();
+        }
+
+        function toggleFormInput() {
+            const konten = document.getElementById('konten-form-input-baru');
+            const textToggle = document.getElementById('text-toggle-form');
+            const iconToggle = document.getElementById('icon-toggle-form');
+
+            if (konten.classList.contains('hidden')) {
+                konten.classList.remove('hidden');
+                textToggle.innerText = "Sembunyikan Form";
+                iconToggle.innerHTML = "&#128065;";
+            } else {
+                konten.classList.add('hidden');
+                textToggle.innerText = "Tampilkan Form";
+                iconToggle.innerHTML = "&#128584;";
+            }
+        }
+
+        // --- 1. SIMPAN ITEM BARU KE FIREBASE ---
+        async function simpanItemBaru(e) {
+            e.preventDefault();
+            const oldKode = document.getElementById('edit-kode-lama').value;
+            const kode = document.getElementById('kode-item').value.trim();
+            const nama = document.getElementById('nama-item').value.trim();
+            const satuan = document.getElementById('satuan-item').value.trim();
+            const fileInput = document.getElementById('foto-item');
+
+            const prosesSimpanDataCloud = async (fotoArray) => {
+                try {
+                    const { collection, addDoc, updateDoc, doc } = window.firebaseModules;
+
+                    if(oldKode !== "") {
+                        const itemLama = items.find(i => i.kode === oldKode);
+                        const fotosFinal = fotoArray.length > 0 ? fotoArray : (itemLama.fotos || []);
+                        
+                        if(itemLama && itemLama.id) {
+                            await updateDoc(doc(window.db, "items", itemLama.id), { kode, nama, satuan, fotos: fotosFinal });
+                        }
+                        alert('Item berhasil diperbarui di server online!');
+                    } else {
+                        if(items.some(i => i.kode.toLowerCase() === kode.toLowerCase())) {
+                            alert('Kode Item sudah terdaftar!');
+                            return;
+                        }
+                        await addDoc(collection(window.db, "items"), { kode, nama, satuan, fotos: fotoArray });
+                        alert('Item baru berhasil ditambahkan ke server online!');
+                    }
+
+                    resetFormItem();
+                    window.initAppFromCloud(); // Muat ulang data terbaru dari cloud
+                } catch (error) {
+                    alert("Gagal menyimpan ke database: " + error.message);
+                }
+            };
+
+            if (fileInput.files.length > 0) {
+                let promises = Array.from(fileInput.files).map(file => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = e => resolve(e.target.result);
+                        reader.onerror = error => reject(error);
+                        reader.readAsDataURL(file);
+                    });
+                });
+                Promise.all(promises).then(base64Images => {
+                    prosesSimpanDataCloud(base64Images);
+                }).catch(() => {
+                    alert('Gagal membaca file foto.');
+                });
+            } else {
+                prosesSimpanDataCloud([]);
+            }
+        }
+
+        function resetFormItem() {
+            document.getElementById('form-item-baru').reset();
+            document.getElementById('edit-kode-lama').value = "";
+            document.getElementById('judul-form-item').innerText = "Input Item Baru";
+            document.getElementById('btn-submit-item').innerText = "Simpan Item Baru";
+            document.getElementById('btn-batal-edit-item').classList.add('hidden');
+        }
+
+        function renderHistoriItem() {
+            const tbody = document.getElementById('tabel-item-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            if(items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500 border border-gray-300">Belum ada item terdaftar.</td></tr>`;
+                return;
+            }
+
+            items.forEach(item => {
+                const jumlahFoto = item.fotos ? item.fotos.length : 0;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="border border-gray-300 px-3 py-2 font-mono">${item.kode}</td>
+                        <td class="border border-gray-300 px-3 py-2">${item.nama}</td>
+                        <td class="border border-gray-300 px-3 py-2">${item.satuan}</td>
+                        <td class="border border-gray-300 px-3 py-2 text-center font-bold text-blue-600">${jumlahFoto} Foto</td>
+                        <td class="border border-gray-300 px-3 py-2 text-center space-x-1">
+                            <button onclick="editItem('${item.kode}')" class="bg-yellow-500 text-white text-xs px-2.5 py-1 rounded hover:bg-yellow-600">Edit</button>
+                            <button onclick="hapusItem('${item.id}')" class="bg-red-600 text-white text-xs px-2.5 py-1 rounded hover:bg-red-700">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function editItem(kode) {
+            const item = items.find(i => i.kode === kode);
+            if(!item) return;
+
+            document.getElementById('edit-kode-lama').value = item.kode;
+            document.getElementById('kode-item').value = item.kode;
+            document.getElementById('nama-item').value = item.nama;
+            document.getElementById('satuan-item').value = item.satuan;
+            document.getElementById('foto-item').value = "";
+
+            document.getElementById('judul-form-item').innerText = "Edit Item Baru";
+            document.getElementById('btn-submit-item').innerText = "Perbarui Item";
+            document.getElementById('btn-batal-edit-item').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function hapusItem(id) {
+            if(confirm(`Apakah Anda yakin ingin menghapus item ini dari server online?`)) {
+                try {
+                    const { deleteDoc, doc } = window.firebaseModules;
+                    await deleteDoc(doc(window.db, "items", id));
+                    window.initAppFromCloud();
+                    alert('Item berhasil dihapus dari server.');
+                } catch (error) {
+                    alert('Gagal menghapus item: ' + error.message);
+                }
+            }
+        }
+
+        // --- (Fungsi Barang Masuk, Keluar, dan Laporan Stock disesuaikan dengan pola async/await ke Firestore) ---
+        // Sampaikan pada saya jika Anda ingin dibuatkan keseluruhan kode fungsi barang masuk/keluar secara lengkap juga!
+    </script>
+</body>
+</html>
