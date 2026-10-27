@@ -25,7 +25,36 @@
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+<script type="module">
+        // 1. Import library Firebase yang dibutuhkan dari CDN resmi
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
 
+        // 2. Konfigurasi Firebase milik project kamu (YANG KAMU BERIKAN)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDzSlgERmKV86DMzxKmDfjlBhuPOHfx1JY",
+            authDomain: "mechmar-stock.firebaseapp.com",
+            projectId: "mechmar-stock",
+            storageBucket: "mechmar-stock.firebasestorage.app",
+            messagingSenderId: "836145399985",
+            appId: "1:836145399985:web:17f25497270e3413b47a90",
+            measurementId: "G-69QXSQ22RD"
+        };
+
+        // 3. Inisialisasi koneksi ke Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // 4. Contoh Fungsi Simpan Data ke Firestore
+        window.simpanItemBaru = async function() {
+            try {
+                // Proses penyimpanan data ke database Firebase akan diproses di sini
+                alert('Berhasil terhubung ke Firebase Mechmar Stock!');
+            } catch (error) {
+                console.error("Error saat menyimpan: ", error);
+                alert('Gagal menyimpan: ' + error.message);
+            }
+        };
     <!-- HEADER SECTION -->
     <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
