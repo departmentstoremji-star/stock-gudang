@@ -3,273 +3,946 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Stock Gudang - MECHMAR</title>
-    <!-- Tailwind CSS untuk Desain -->
+    <title>Sistem Stok Gudang - PT. Mechmar Jaya Industries</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Firebase SDK (Modular) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        // Ganti konfigurasi di bawah ini dengan konfigurasi dari Firebase Console Anda
-        const firebaseConfig = {
-  apiKey: "AIzaSyAd_4OstX15MuDnAR-oJjwzTOikApQoqng",
-  authDomain: "mechmar-stock-gudang.firebaseapp.com",
-  projectId: "mechmar-stock-gudang",
-  storageBucket: "mechmar-stock-gudang.firebasestorage.app",
-  messagingSenderId: "1060677476187",
-  appId: "1:1060677476187:web:eb68281a8580102a42447e",
-  measurementId: "G-HW16X3857K"
-};
-  
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // Ekspor ke variabel global agar bisa diakses fungsi lain di bawah
-        window.db = db;
-        window.firebaseModules = { collection, getDocs, addDoc, updateDoc, deleteDoc, doc };
-        
-        // Panggil fungsi untuk memuat data dari internet saat pertama kali dibuka
-        window.initAppFromCloud();
-    </script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- JsBarcode CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
     <style>
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Dropdown Hover Animation */
+        .dropdown-menu {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+            transform: translateY(10px);
+        }
+        .dropdown:hover .dropdown-menu {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
-    <!-- (Bagian HTML Body Tetap Sama Seperti Kode Asli Anda) -->
-    
-    <!-- JavaScript Logika Sistem yang Terhubung ke Cloud -->
-    <script>
-        let items = [];
-        let transaksi = [];
-        let currentItemFotos = [];
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-        // Fungsi utama untuk memuat data dari Firebase Firestore
-        window.initAppFromCloud = async function() {
-            try {
-                const { collection, getDocs } = window.firebaseModules;
+    <!-- HEADER / NAVIGATION -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
                 
-                // Ambil data items dari Firestore
-                const querySnapshotItems = await getDocs(collection(window.db, "items"));
-                items = [];
-                querySnapshotItems.forEach((doc) => {
-                    items.push({ id: doc.id, ...doc.data() });
-                });
+                <!-- Logo & Realtime Clock -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-3 bg-slate-800 p-2.5 rounded-xl border border-slate-700">
+                        <div class="bg-blue-600 p-2 rounded-lg text-white font-black text-xl tracking-wider">
+                            MJI
+                        </div>
+                        <div>
+                            <h1 class="text-sm font-bold leading-none text-white tracking-wide">PT. MECHMAR JAYA INDUSTRIES</h1>
+                            <p class="text-[10px] text-blue-400 tracking-wider font-semibold uppercase mt-0.5">Warehouse Management System</p>
+                        </div>
+                    </div>
+                    <!-- Realtime Date & Time -->
+                    <div class="hidden md:flex flex-col text-xs text-slate-300 border-l border-slate-700 pl-4">
+                        <span id="currentDate" class="font-medium text-slate-400">Loading date...</span>
+                        <span id="currentTime" class="font-bold text-blue-400 text-sm">Loading time...</span>
+                    </div>
+                </div>
 
-                // Ambil data transaksi dari Firestore
-                const querySnapshotTransaksi = await getDocs(collection(window.db, "transaksi"));
-                transaksi = [];
-                querySnapshotTransaksi.forEach((doc) => {
-                    transaksi.push({ id: doc.id, ...doc.data() });
-                });
+                <!-- Navigation Bar -->
+                <nav class="hidden md:flex space-x-1">
+                    <button onclick="switchTab('home')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-blue-400 transition">
+                        <i class="fa-solid fa-house mr-1.5"></i> Home
+                    </button>
 
-                // Render ulang tampilan setelah data berhasil diambil dari internet
-                updateDatalistItem();
-                renderHistoriItem();
-                renderStock();
-                renderHistoriMasuk();
-                renderHistoriKeluar();
-            } catch (error) {
-                console.error("Gagal memuat data dari cloud: ", error);
+                    <!-- Data Hover Dropdown -->
+                    <div class="relative dropdown">
+                        <button class="px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-blue-400 transition flex items-center">
+                            <i class="fa-solid fa-boxes-stacked mr-1.5"></i> Data <i class="fa-solid fa-chevron-down ml-1.5 text-xs text-slate-400"></i>
+                        </button>
+                        <div class="dropdown-menu absolute left-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800">
+                            <a href="#" onclick="openModal('modalInputItem Baru')" class="block px-4 py-2.5 text-sm hover:bg-blue-50 hover:text-blue-600 transition font-medium">
+                                <i class="fa-solid fa-square-plus mr-2 text-blue-500"></i> Input Item Baru
+                            </a>
+                            <a href="#" onclick="openModal('modalDaftarItem')" class="block px-4 py-2.5 text-sm hover:bg-blue-50 hover:text-blue-600 transition font-medium">
+                                <i class="fa-solid fa-list-ul mr-2 text-blue-500"></i> Daftar Item
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Pembelian Hover Dropdown -->
+                    <div class="relative dropdown">
+                        <button class="px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-blue-400 transition flex items-center">
+                            <i class="fa-solid fa-cart-flatbed mr-1.5"></i> Pembelian <i class="fa-solid fa-chevron-down ml-1.5 text-xs text-slate-400"></i>
+                        </button>
+                        <div class="dropdown-menu absolute left-0 mt-1 w-64 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800">
+                            <a href="#" onclick="openModal('modalInputPenerimaan')" class="block px-4 py-2.5 text-sm hover:bg-emerald-50 hover:text-emerald-600 transition font-medium">
+                                <i class="fa-solid fa-file-circle-plus mr-2 text-emerald-500"></i> Input Penerimaan Barang
+                            </a>
+                            <a href="#" onclick="openModal('modalDaftarPenerimaan')" class="block px-4 py-2.5 text-sm hover:bg-emerald-50 hover:text-emerald-600 transition font-medium">
+                                <i class="fa-solid fa-clipboard-list mr-2 text-emerald-500"></i> Daftar Penerimaan Barang
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Produksi Hover Dropdown -->
+                    <div class="relative dropdown">
+                        <button class="px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-blue-400 transition flex items-center">
+                            <i class="fa-solid fa-industry mr-1.5"></i> Produksi <i class="fa-solid fa-chevron-down ml-1.5 text-xs text-slate-400"></i>
+                        </button>
+                        <div class="dropdown-menu absolute left-0 mt-1 w-60 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 text-slate-800">
+                            <a href="#" onclick="openModal('modalInputPemakaian')" class="block px-4 py-2.5 text-sm hover:bg-amber-50 hover:text-amber-600 transition font-medium">
+                                <i class="fa-solid fa-dolly mr-2 text-amber-500"></i> Input Pemakaian Barang
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Laporan Stock -->
+                    <button onclick="switchTab('laporan')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-blue-400 transition">
+                        <i class="fa-solid fa-chart-column mr-1.5"></i> Laporan Stock
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- TAB: HOME -->
+        <section id="tab-home" class="space-y-8">
+            <!-- Hero Banner -->
+            <div class="relative bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 sm:p-12 text-white shadow-2xl overflow-hidden border border-slate-800">
+                <div class="absolute -right-10 -bottom-10 opacity-10 text-white pointer-events-none">
+                    <i class="fa-solid fa-warehouse text-[280px]"></i>
+                </div>
+                <div class="max-w-3xl relative z-10 space-y-6">
+                    <span class="bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-semibold px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+                        Sistem Inventaris Modern
+                    </span>
+                    <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight text-white">
+                        Kelola Stok Gudang Lebih Akurat, Efisien, dan Terintegrasi
+                    </h1>
+                    <p class="text-slate-300 text-base sm:text-lg leading-relaxed font-normal">
+                        PT. Mechmar Jaya Industries menghadirkan sistem manajemen inventaris modern untuk memastikan setiap barang tercatat presisi, mempercepat rantai pasok, dan mendukung operasional bisnis Anda tanpa hambatan.
+                    </p>
+                    <div class="flex flex-wrap gap-4 pt-2">
+                        <button onclick="switchTab('laporan')" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-blue-500/25 transition">
+                            <i class="fa-solid fa-boxes-stacked mr-2"></i> Lihat Laporan Stok
+                        </button>
+                        <button onclick="openModal('modalInputItem Baru')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold px-6 py-3 rounded-xl transition">
+                            <i class="fa-solid fa-plus mr-2"></i> Tambah Item Baru
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Item Registered</p>
+                        <h3 id="statTotalItem" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-cubes"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Transaksi Masuk</p>
+                        <h3 id="statTotalMasuk" class="text-2xl font-bold text-emerald-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-arrow-down-left-and-arrow-up-right-to-inside"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Transaksi Keluar</p>
+                        <h3 id="statTotalKeluar" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-truck-ramp-box"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status Sinkronisasi</p>
+                        <h3 class="text-sm font-bold text-emerald-600 mt-1 flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping mr-2"></span> Realtime Online
+                        </h3>
+                    </div>
+                    <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-cloud"></i>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB: LAPORAN STOK -->
+        <section id="tab-laporan" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Laporan Stock Gudang</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Petunjuk: Double click pada baris item untuk melihat Histori Mutasi Stok.</p>
+                    </div>
+                    <div class="relative w-full sm:w-72">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="searchStock" oninput="renderStockTable()" placeholder="Cari Kode atau Nama Barang..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-100 text-slate-700 font-semibold uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="p-4">Kode Item</th>
+                                <th class="p-4">Nama Item</th>
+                                <th class="p-4">Jenis Barang</th>
+                                <th class="p-4 text-center">Stok Saat Ini</th>
+                                <th class="p-4">Satuan</th>
+                                <th class="p-4 text-center">Foto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockTableBody" class="divide-y divide-slate-200 bg-white">
+                            <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            &copy; 2026 PT. Mechmar Jaya Industries. All rights reserved. Warehouse Realtime System.
+        </div>
+    </footer>
+
+    <!-- ==================== MODALS / POPUPS ==================== -->
+
+    <!-- MODAL 1: INPUT ITEM BARU -->
+    <div id="modalInputItem Baru" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center">
+                    <i class="fa-solid fa-box-archive mr-2 text-blue-400"></i> Input Item Baru
+                </h3>
+                <button onclick="closeModal('modalInputItem Baru')" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formInputItem" onsubmit="saveItem(event)" class="p-6 space-y-4">
+                <input type="hidden" id="itemDocId">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Kode Item</label>
+                    <input type="text" id="itemKode" required placeholder="Contoh: BRG-001" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nama Item</label>
+                    <input type="text" id="itemNama" required placeholder="Contoh: Steel Pipe 2 Inch" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Jenis Barang</label>
+                        <input type="text" id="itemJenis" placeholder="Contoh: Material / Sparepart" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Satuan</label>
+                        <input type="text" id="itemSatuan" required placeholder="Contoh: Pcs / Meter / Kg" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Barcode & Image Section -->
+                <div class="pt-2 border-t border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <button type="button" onclick="generateBarcodePreview()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 transition">
+                            <i class="fa-solid fa-barcode mr-1"></i> Buat Barcode
+                        </button>
+                        <label class="cursor-pointer bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-semibold px-3 py-1.5 rounded-lg border border-blue-200 transition">
+                            <i class="fa-solid fa-camera mr-1"></i> Tambahkan Foto
+                            <input type="file" id="itemFoto" accept="image/*" onchange="previewImage(event)" class="hidden">
+                        </label>
+                    </div>
+                    
+                    <!-- Barcode Display Container -->
+                    <div id="barcodeContainer" class="hidden text-center p-2 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                        <svg id="barcodeSvg" class="mx-auto"></svg>
+                    </div>
+
+                    <!-- Photo Preview Container -->
+                    <div id="imagePreviewContainer" class="hidden text-center">
+                        <img id="imagePreview" src="" alt="Preview" class="max-h-32 mx-auto rounded-lg border border-slate-300 object-cover shadow-sm">
+                    </div>
+                </div>
+
+                <!-- Modal Action Buttons -->
+                <div class="pt-4 flex justify-end space-x-2 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modalInputItem Baru')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition">
+                        Keluar
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-md transition">
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: DAFTAR ITEM -->
+    <div id="modalDaftarItem" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden border border-slate-100 flex flex-col max-h-[85vh]">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center">
+                    <i class="fa-solid fa-list-ul mr-2 text-blue-400"></i> Daftar Item Master
+                </h3>
+                <button onclick="closeModal('modalDaftarItem')" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-4 bg-slate-50 border-b border-slate-200">
+                <p class="text-xs text-slate-500">Klik ganda (double-click) pada baris item untuk mengedit data item.</p>
+            </div>
+            <div class="p-6 overflow-y-auto flex-grow">
+                <table class="w-full text-left text-sm text-slate-600 border border-slate-200 rounded-lg overflow-hidden">
+                    <thead class="bg-slate-100 text-slate-700 font-semibold uppercase text-xs">
+                        <tr>
+                            <th class="p-3">Kode</th>
+                            <th class="p-3">Nama Item</th>
+                            <th class="p-3">Jenis</th>
+                            <th class="p-3">Satuan</th>
+                            <th class="p-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="masterItemsTableBody" class="divide-y divide-slate-200">
+                        <!-- Dynamic items -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button onclick="closeModal('modalDaftarItem')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-xl transition">Keluar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: INPUT PENERIMAAN BARANG -->
+    <div id="modalInputPenerimaan" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center">
+                    <i class="fa-solid fa-truck-droplet mr-2 text-emerald-400"></i> Input Penerimaan Barang (Masuk)
+                </h3>
+                <button onclick="closeModal('modalInputPenerimaan')" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formPenerimaan" onsubmit="savePenerimaan(event)" class="p-6 space-y-4 overflow-y-auto flex-grow">
+                <input type="hidden" id="penerimaanDocId">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nomor Penerimaan Barang</label>
+                        <input type="text" id="penNo" required placeholder="Contoh: RCV-2026-001" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tanggal</label>
+                        <input type="date" id="penTgl" required class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nama Supplier</label>
+                    <input type="text" id="penSupplier" placeholder="Nama Supplier / Vendor" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Catatan (Opsional)</label>
+                    <textarea id="penCatatan" rows="2" placeholder="Catatan tambahan..." class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                </div>
+
+                <!-- Dynamic Item Selector -->
+                <div class="border-t border-slate-200 pt-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs font-bold text-slate-800 uppercase">Daftar Barang Masuk</label>
+                        <button type="button" onclick="addPenerimaanRow()" class="text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1 rounded-lg transition">
+                            <i class="fa-solid fa-plus mr-1"></i> Tambah Baris
+                        </button>
+                    </div>
+                    <div class="space-y-2" id="penerimaanItemsContainer">
+                        <!-- Rows injected dynamically -->
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end space-x-2 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modalInputPenerimaan')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition">Keluar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-md transition">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: DAFTAR PENERIMAAN BARANG -->
+    <div id="modalDaftarPenerimaan" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-100 flex flex-col max-h-[85vh]">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center">
+                    <i class="fa-solid fa-clipboard-list mr-2 text-emerald-400"></i> Daftar Penerimaan Barang
+                </h3>
+                <button onclick="closeModal('modalDaftarPenerimaan')" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-grow">
+                <table class="w-full text-left text-sm text-slate-600 border border-slate-200 rounded-lg overflow-hidden">
+                    <thead class="bg-slate-100 text-slate-700 font-semibold uppercase text-xs">
+                        <tr>
+                            <th class="p-3">No. Penerimaan</th>
+                            <th class="p-3">Tanggal</th>
+                            <th class="p-3">Supplier</th>
+                            <th class="p-3">Detail Item</th>
+                        </tr>
+                    </thead>
+                    <tbody id="daftarPenerimaanBody" class="divide-y divide-slate-200">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button onclick="closeModal('modalDaftarPenerimaan')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-xl transition">Keluar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: INPUT PEMAKAIAN BARANG (PRODUKSI) -->
+    <div id="modalInputPemakaian" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center">
+                    <i class="fa-solid fa-dolly mr-2 text-amber-400"></i> Input Pemakaian Barang (Keluar)
+                </h3>
+                <button onclick="closeModal('modalInputPemakaian')" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formPemakaian" onsubmit="savePemakaian(event)" class="p-6 space-y-4 overflow-y-auto flex-grow">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nomor Pemakaian Barang</label>
+                        <input type="text" id="pemNo" required placeholder="Contoh: OUT-2026-001" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tanggal</label>
+                        <input type="date" id="pemTgl" required class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Kode Project</label>
+                    <input type="text" id="pemProject" required placeholder="Contoh: PRJ-MECH-02" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Catatan (Opsional)</label>
+                    <textarea id="pemCatatan" rows="2" placeholder="Catatan peruntukan barang..." class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"></textarea>
+                </div>
+
+                <!-- Dynamic Item Selector -->
+                <div class="border-t border-slate-200 pt-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs font-bold text-slate-800 uppercase">Daftar Barang Dipergunakan</label>
+                        <button type="button" onclick="addPemakaianRow()" class="text-xs font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 px-3 py-1 rounded-lg transition">
+                            <i class="fa-solid fa-plus mr-1"></i> Tambah Baris
+                        </button>
+                    </div>
+                    <div class="space-y-2" id="pemakaianItemsContainer">
+                        <!-- Rows injected dynamically -->
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end space-x-2 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('modalInputPemakaian')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition">Keluar</button>
+                    <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl shadow-md transition">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 6: HISTORI ITEM (POPUPS ON DOUBLE CLICK) -->
+    <div id="modalHistoriItem" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center">
+                    <i class="fa-solid fa-clock-rotate-left mr-2 text-blue-400"></i> Histori Transaksi Stock
+                </h3>
+                <button onclick="closeModal('modalHistoriItem')" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="bg-blue-50/60 p-3 rounded-xl border border-blue-100 text-xs flex justify-between items-center">
+                    <div>
+                        <p class="font-semibold text-blue-900" id="historiNamaItem">-</p>
+                        <p class="text-blue-600" id="historiKodeItem">-</p>
+                    </div>
+                    <span class="px-3 py-1 bg-blue-600 text-white font-bold rounded-lg" id="historiStokSaatIni">Stok: 0</span>
+                </div>
+                <div class="max-h-60 overflow-y-auto">
+                    <table class="w-full text-left text-xs text-slate-600 border border-slate-200 rounded-lg">
+                        <thead class="bg-slate-100 uppercase text-slate-700 font-semibold">
+                            <tr>
+                                <th class="p-2.5">Tanggal</th>
+                                <th class="p-2.5">Tipe</th>
+                                <th class="p-2.5">Ref / No Document</th>
+                                <th class="p-2.5 text-right">Jumlah</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historiTableBody" class="divide-y divide-slate-200">
+                            <!-- Dynamic history -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button onclick="closeModal('modalHistoriItem')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-xl transition">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 7: PHOTO GALLERY LIGHTBOX -->
+    <div id="modalPhotoGallery" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden p-6 text-center space-y-4 relative">
+            <button onclick="closeModal('modalPhotoGallery')" class="absolute top-3 right-3 text-slate-400 hover:text-slate-700 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="font-bold text-slate-800 text-base" id="galleryItemName">Foto Identitas Stok</h3>
+            <div class="bg-slate-100 rounded-xl p-2 border border-slate-200 flex items-center justify-center min-h-[200px]">
+                <img id="galleryImage" src="" alt="Foto Item" class="max-h-80 w-auto rounded-lg object-contain cursor-pointer transition hover:scale-105" onclick="toggleZoomImage(this)">
+            </div>
+            <p class="text-[11px] text-slate-400">Klik gambar untuk memperbesar tampilan.</p>
+        </div>
+    </div>
+
+    <!-- ==================== FIREBASE REALTIME SCRIPT ==================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot, getDocs, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase configuration
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mechmar-gudang-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "demo-api-key",
+            authDomain: "demo-app.firebaseapp.com",
+            projectId: "demo-app",
+            storageBucket: "demo-app.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:12345"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let masterItems = [];
+        let penerimaanDocs = [];
+        let pemakaianDocs = [];
+
+        // Collection paths
+        const getPublicColl = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
+
+        // Authentication Setup
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth Exception:", err);
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                setupRealtimeListeners();
+            }
+        });
+
+        // Realtime Data Sync
+        function setupRealtimeListeners() {
+            // 1. Listen to Master Items
+            onSnapshot(getPublicColl('master_items'), (snapshot) => {
+                masterItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderStockTable();
+                renderMasterItemsTable();
+                document.getElementById('statTotalItem').textContent = masterItems.length;
+            }, (error) => console.error("Error items listener:", error));
+
+            // 2. Listen to Penerimaan (Barang Masuk)
+            onSnapshot(getPublicColl('penerimaan_barang'), (snapshot) => {
+                penerimaanDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderDaftarPenerimaan();
+                document.getElementById('statTotalMasuk').textContent = penerimaanDocs.length;
+            }, (error) => console.error("Error penerimaan listener:", error));
+
+            // 3. Listen to Pemakaian (Barang Keluar)
+            onSnapshot(getPublicColl('pemakaian_barang'), (snapshot) => {
+                pemakaianDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                document.getElementById('statTotalKeluar').textContent = pemakaianDocs.length;
+            }, (error) => console.error("Error pemakaian listener:", error));
+        }
+
+        // --- Save Item Baru / Edit ---
+        window.saveItem = async function(e) {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const docId = document.getElementById('itemDocId').value;
+            const kode = document.getElementById('itemKode').value.trim();
+            const nama = document.getElementById('itemNama').value.trim();
+            const jenis = document.getElementById('itemJenis').value.trim();
+            const satuan = document.getElementById('itemSatuan').value.trim();
+            const fotoPreview = document.getElementById('imagePreview').src;
+
+            const itemData = {
+                kode,
+                nama,
+                jenis,
+                satuan,
+                foto: fotoPreview.startsWith('data:image') ? fotoPreview : '',
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                if (docId) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_items', docId), itemData);
+                } else {
+                    itemData.stok = 0; // Default stok awal
+                    await addDoc(getPublicColl('master_items'), itemData);
+                }
+                closeModal('modalInputItem Baru');
+                document.getElementById('formInputItem').reset();
+                document.getElementById('imagePreviewContainer').classList.add('hidden');
+                document.getElementById('barcodeContainer').classList.add('hidden');
+            } catch (err) {
+                console.error("Error saving item:", err);
             }
         };
 
-        // Navigasi Tab
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('bg-white', 'text-red-700');
-                btn.classList.add('bg-red-800', 'text-white');
-            });
-
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.remove('bg-red-800', 'text-white');
-            event.target.classList.add('bg-white', 'text-red-700');
-
-            if(tabId === 'input-item') renderHistoriItem();
-            if(tabId === 'laporan-stock') renderStock();
-            if(tabId === 'barang-masuk') {
-                updateDatalistItem();
-                renderHistoriMasuk();
-            }
-            if(tabId === 'barang-keluar') {
-                updateDatalistItem();
-                renderHistoriKeluar();
-            }
-        }
-
-        // Jam Real-Time
-        setInterval(() => {
-            const now = new Date();
-            document.getElementById('realtime-clock').innerText = now.toLocaleTimeString('id-ID') + ' - ' + now.toLocaleDateString('id-ID', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
-        }, 1000);
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const today = new Date().toISOString().split('T')[0];
-            const tglMasuk = document.getElementById('tanggal-masuk');
-            const tglKeluar = document.getElementById('tanggal-keluar');
-            if(tglMasuk) tglMasuk.value = today;
-            if(tglKeluar) tglKeluar.value = today;
-        });
-
-        function updateDatalistItem() {
-            const datalist = document.getElementById('list-opsi-item');
-            if (!datalist) return;
-            datalist.innerHTML = '';
-            items.forEach(i => {
-                datalist.innerHTML += `<option value="${i.kode} - ${i.nama}">`;
-            });
-        }
-
-        function ambilKodeItem(teksInput) {
-            if (!teksInput) return '';
-            const bagian = teksInput.split(' - ');
-            return bagian[0].trim();
-        }
-
-        function toggleFormInput() {
-            const konten = document.getElementById('konten-form-input-baru');
-            const textToggle = document.getElementById('text-toggle-form');
-            const iconToggle = document.getElementById('icon-toggle-form');
-
-            if (konten.classList.contains('hidden')) {
-                konten.classList.remove('hidden');
-                textToggle.innerText = "Sembunyikan Form";
-                iconToggle.innerHTML = "&#128065;";
-            } else {
-                konten.classList.add('hidden');
-                textToggle.innerText = "Tampilkan Form";
-                iconToggle.innerHTML = "&#128584;";
-            }
-        }
-
-        // --- 1. SIMPAN ITEM BARU KE FIREBASE ---
-        async function simpanItemBaru(e) {
+        // --- Save Penerimaan Barang (Auto increment stock) ---
+        window.savePenerimaan = async function(e) {
             e.preventDefault();
-            const oldKode = document.getElementById('edit-kode-lama').value;
-            const kode = document.getElementById('kode-item').value.trim();
-            const nama = document.getElementById('nama-item').value.trim();
-            const satuan = document.getElementById('satuan-item').value.trim();
-            const fileInput = document.getElementById('foto-item');
+            if (!currentUser) return;
 
-            const prosesSimpanDataCloud = async (fotoArray) => {
-                try {
-                    const { collection, addDoc, updateDoc, doc } = window.firebaseModules;
+            const noPen = document.getElementById('penNo').value;
+            const tgl = document.getElementById('penTgl').value;
+            const supplier = document.getElementById('penSupplier').value;
+            const catatan = document.getElementById('penCatatan').value;
 
-                    if(oldKode !== "") {
-                        const itemLama = items.find(i => i.kode === oldKode);
-                        const fotosFinal = fotoArray.length > 0 ? fotoArray : (itemLama.fotos || []);
-                        
-                        if(itemLama && itemLama.id) {
-                            await updateDoc(doc(window.db, "items", itemLama.id), { kode, nama, satuan, fotos: fotosFinal });
-                        }
-                        alert('Item berhasil diperbarui di server online!');
-                    } else {
-                        if(items.some(i => i.kode.toLowerCase() === kode.toLowerCase())) {
-                            alert('Kode Item sudah terdaftar!');
-                            return;
-                        }
-                        await addDoc(collection(window.db, "items"), { kode, nama, satuan, fotos: fotoArray });
-                        alert('Item baru berhasil ditambahkan ke server online!');
+            const rows = document.querySelectorAll('.penerimaan-row');
+            const items = [];
+
+            for (let r of rows) {
+                const kode = r.querySelector('.row-kode').value;
+                const qty = parseFloat(r.querySelector('.row-qty').value) || 0;
+                if (kode && qty > 0) {
+                    items.push({ kode, qty });
+                    
+                    // Increment Stock
+                    const matchedItem = masterItems.find(i => i.kode === kode);
+                    if (matchedItem) {
+                        const newStock = (parseFloat(matchedItem.stok) || 0) + qty;
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_items', matchedItem.id), { stok: newStock });
                     }
-
-                    resetFormItem();
-                    window.initAppFromCloud(); // Muat ulang data terbaru dari cloud
-                } catch (error) {
-                    alert("Gagal menyimpan ke database: " + error.message);
                 }
+            }
+
+            const docData = {
+                noPen, tgl, supplier, catatan, items, createdAt: new Date().toISOString()
             };
 
-            if (fileInput.files.length > 0) {
-                let promises = Array.from(fileInput.files).map(file => {
-                    return new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = e => resolve(e.target.result);
-                        reader.onerror = error => reject(error);
-                        reader.readAsDataURL(file);
-                    });
-                });
-                Promise.all(promises).then(base64Images => {
-                    prosesSimpanDataCloud(base64Images);
-                }).catch(() => {
-                    alert('Gagal membaca file foto.');
-                });
-            } else {
-                prosesSimpanDataCloud([]);
+            await addDoc(getPublicColl('penerimaan_barang'), docData);
+            closeModal('modalInputPenerimaan');
+            document.getElementById('formPenerimaan').reset();
+        };
+
+        // --- Save Pemakaian Barang (Auto decrement stock) ---
+        window.savePemakaian = async function(e) {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const noPem = document.getElementById('pemNo').value;
+            const tgl = document.getElementById('pemTgl').value;
+            const project = document.getElementById('pemProject').value;
+            const catatan = document.getElementById('pemCatatan').value;
+
+            const rows = document.querySelectorAll('.pemakaian-row');
+            const items = [];
+
+            for (let r of rows) {
+                const kode = r.querySelector('.row-kode').value;
+                const qty = parseFloat(r.querySelector('.row-qty').value) || 0;
+                if (kode && qty > 0) {
+                    items.push({ kode, qty });
+
+                    // Decrement Stock
+                    const matchedItem = masterItems.find(i => i.kode === kode);
+                    if (matchedItem) {
+                        const currentStock = parseFloat(matchedItem.stok) || 0;
+                        const newStock = Math.max(0, currentStock - qty);
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_items', matchedItem.id), { stok: newStock });
+                    }
+                }
             }
-        }
 
-        function resetFormItem() {
-            document.getElementById('form-item-baru').reset();
-            document.getElementById('edit-kode-lama').value = "";
-            document.getElementById('judul-form-item').innerText = "Input Item Baru";
-            document.getElementById('btn-submit-item').innerText = "Simpan Item Baru";
-            document.getElementById('btn-batal-edit-item').classList.add('hidden');
-        }
+            const docData = {
+                noPem, tgl, project, catatan, items, createdAt: new Date().toISOString()
+            };
 
-        function renderHistoriItem() {
-            const tbody = document.getElementById('tabel-item-body');
-            if(!tbody) return;
+            await addDoc(getPublicColl('pemakaian_barang'), docData);
+            closeModal('modalInputPemakaian');
+            document.getElementById('formPemakaian').reset();
+        };
+
+        // Render Tables & View Logics
+        window.renderStockTable = function() {
+            const tbody = document.getElementById('stockTableBody');
+            const search = document.getElementById('searchStock').value.toLowerCase();
             tbody.innerHTML = '';
 
-            if(items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500 border border-gray-300">Belum ada item terdaftar.</td></tr>`;
+            const filtered = masterItems.filter(i => 
+                i.kode.toLowerCase().includes(search) || i.nama.toLowerCase().includes(search)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Belum ada data barang.</td></tr>`;
                 return;
             }
 
-            items.forEach(item => {
-                const jumlahFoto = item.fotos ? item.fotos.length : 0;
-                tbody.innerHTML += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="border border-gray-300 px-3 py-2 font-mono">${item.kode}</td>
-                        <td class="border border-gray-300 px-3 py-2">${item.nama}</td>
-                        <td class="border border-gray-300 px-3 py-2">${item.satuan}</td>
-                        <td class="border border-gray-300 px-3 py-2 text-center font-bold text-blue-600">${jumlahFoto} Foto</td>
-                        <td class="border border-gray-300 px-3 py-2 text-center space-x-1">
-                            <button onclick="editItem('${item.kode}')" class="bg-yellow-500 text-white text-xs px-2.5 py-1 rounded hover:bg-yellow-600">Edit</button>
-                            <button onclick="hapusItem('${item.id}')" class="bg-red-600 text-white text-xs px-2.5 py-1 rounded hover:bg-red-700">Hapus</button>
-                        </td>
-                    </tr>
+            filtered.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-blue-50/50 cursor-pointer transition";
+                tr.ondblclick = () => openHistoriModal(item.kode);
+                tr.innerHTML = `
+                    <td class="p-4 font-semibold text-blue-600">${item.kode}</td>
+                    <td class="p-4 font-medium text-slate-800">${item.nama}</td>
+                    <td class="p-4 text-slate-500">${item.jenis || '-'}</td>
+                    <td class="p-4 text-center font-bold text-slate-800">${item.stok || 0}</td>
+                    <td class="p-4 text-slate-500">${item.satuan}</td>
+                    <td class="p-4 text-center">
+                        ${item.foto ? `<button onclick="openPhotoGallery('${item.nama}', '${item.foto}')" class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition"><i class="fa-solid fa-image mr-1"></i> Tampilkan Foto</button>` : `<span class="text-xs text-slate-300">Tidak Ada</span>`}
+                    </td>
                 `;
+                tbody.appendChild(tr);
             });
+        };
+
+        window.renderMasterItemsTable = function() {
+            const tbody = document.getElementById('masterItemsTableBody');
+            tbody.innerHTML = '';
+            masterItems.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 cursor-pointer";
+                tr.ondblclick = () => editItem(item);
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-slate-800">${item.kode}</td>
+                    <td class="p-3">${item.nama}</td>
+                    <td class="p-3">${item.jenis || '-'}</td>
+                    <td class="p-3">${item.satuan}</td>
+                    <td class="p-3 text-center">
+                        <button onclick='editItem(${JSON.stringify(item)})' class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-md text-xs font-semibold"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        window.renderDaftarPenerimaan = function() {
+            const tbody = document.getElementById('daftarPenerimaanBody');
+            tbody.innerHTML = '';
+            penerimaanDocs.forEach(pen => {
+                const itemsList = pen.items ? pen.items.map(i => `${i.kode} (${i.qty})`).join(', ') : '-';
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50";
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-slate-800">${pen.noPen}</td>
+                    <td class="p-3">${pen.tgl}</td>
+                    <td class="p-3">${pen.supplier || '-'}</td>
+                    <td class="p-3 text-xs text-slate-600">${itemsList}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        window.openHistoriModal = function(kode) {
+            const item = masterItems.find(i => i.kode === kode);
+            if (!item) return;
+
+            document.getElementById('historiNamaItem').textContent = item.nama;
+            document.getElementById('historiKodeItem').textContent = 'Kode: ' + item.kode;
+            document.getElementById('historiStokSaatIni').textContent = 'Stok: ' + (item.stok || 0) + ' ' + item.satuan;
+
+            const tbody = document.getElementById('historiTableBody');
+            tbody.innerHTML = '';
+
+            let logs = [];
+
+            penerimaanDocs.forEach(p => {
+                p.items?.forEach(i => {
+                    if (i.kode === kode) {
+                        logs.push({ tgl: p.tgl, tipe: 'Masuk (Pembelian)', ref: p.noPen, qty: '+' + i.qty, cls: 'text-emerald-600 font-bold' });
+                    }
+                });
+            });
+
+            pemakaianDocs.forEach(p => {
+                p.items?.forEach(i => {
+                    if (i.kode === kode) {
+                        logs.push({ tgl: p.tgl, tipe: 'Keluar (Produksi)', ref: p.noPem, qty: '-' + i.qty, cls: 'text-amber-600 font-bold' });
+                    }
+                });
+            });
+
+            if (logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Belum ada riwayat mutasi stok.</td></tr>`;
+            } else {
+                logs.forEach(l => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-2.5">${l.tgl}</td>
+                            <td class="p-2.5 font-medium">${l.tipe}</td>
+                            <td class="p-2.5 text-slate-500">${l.ref}</td>
+                            <td class="p-2.5 text-right ${l.cls}">${l.qty}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            openModal('modalHistoriItem');
+        };
+
+        // Initialize Auth
+        initAuth();
+    </script>
+
+    <!-- ==================== UI & INTERACTION SCRIPTS ==================== -->
+    <script>
+        // Realtime Clock Function
+        function updateClock() {
+            const now = new Date();
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('id-ID', dateOptions);
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('id-ID') + " WIB";
         }
+        setInterval(updateClock, 1000);
+        updateClock();
 
-        function editItem(kode) {
-            const item = items.find(i => i.kode === kode);
-            if(!item) return;
-
-            document.getElementById('edit-kode-lama').value = item.kode;
-            document.getElementById('kode-item').value = item.kode;
-            document.getElementById('nama-item').value = item.nama;
-            document.getElementById('satuan-item').value = item.satuan;
-            document.getElementById('foto-item').value = "";
-
-            document.getElementById('judul-form-item').innerText = "Edit Item Baru";
-            document.getElementById('btn-submit-item').innerText = "Perbarui Item";
-            document.getElementById('btn-batal-edit-item').classList.remove('hidden');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        async function hapusItem(id) {
-            if(confirm(`Apakah Anda yakin ingin menghapus item ini dari server online?`)) {
-                try {
-                    const { deleteDoc, doc } = window.firebaseModules;
-                    await deleteDoc(doc(window.db, "items", id));
-                    window.initAppFromCloud();
-                    alert('Item berhasil dihapus dari server.');
-                } catch (error) {
-                    alert('Gagal menghapus item: ' + error.message);
-                }
+        // Modal Open/Close Controls
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            if (modalId === 'modalInputPenerimaan' && document.querySelectorAll('.penerimaan-row').length === 0) {
+                addPenerimaanRow();
+            }
+            if (modalId === 'modalInputPemakaian' && document.querySelectorAll('.pemakaian-row').length === 0) {
+                addPemakaianRow();
             }
         }
 
-        // --- (Fungsi Barang Masuk, Keluar, dan Laporan Stock disesuaikan dengan pola async/await ke Firestore) ---
-        // Sampaikan pada saya jika Anda ingin dibuatkan keseluruhan kode fungsi barang masuk/keluar secara lengkap juga!
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // Tab Switching
+        function switchTab(tab) {
+            document.getElementById('tab-home').classList.add('hidden');
+            document.getElementById('tab-laporan').classList.add('hidden');
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+        }
+
+        // Barcode Generator
+        function generateBarcodePreview() {
+            const kode = document.getElementById('itemKode').value;
+            if (!kode) {
+                alert('Silakan isi Kode Item terlebih dahulu!');
+                return;
+            }
+            const container = document.getElementById('barcodeContainer');
+            container.classList.remove('hidden');
+            JsBarcode("#barcodeSvg", kode, {
+                format: "CODE128",
+                width: 2,
+                height: 50,
+                displayValue: true
+            });
+        }
+
+        // Image Base64 Preview
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imagePreview').src = e.target.result;
+                    document.getElementById('imagePreviewContainer').classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Photo Gallery Lightbox
+        function openPhotoGallery(nama, imgSrc) {
+            document.getElementById('galleryItemName').textContent = nama;
+            document.getElementById('galleryImage').src = imgSrc;
+            openModal('modalPhotoGallery');
+        }
+
+        function toggleZoomImage(imgEl) {
+            imgEl.classList.toggle('scale-150');
+        }
+
+        // Edit Item Helper
+        function editItem(item) {
+            closeModal('modalDaftarItem');
+            document.getElementById('itemDocId').value = item.id || '';
+            document.getElementById('itemKode').value = item.kode || '';
+            document.getElementById('itemNama').value = item.nama || '';
+            document.getElementById('itemJenis').value = item.jenis || '';
+            document.getElementById('itemSatuan').value = item.satuan || '';
+            if (item.foto) {
+                document.getElementById('imagePreview').src = item.foto;
+                document.getElementById('imagePreviewContainer').classList.remove('hidden');
+            }
+            openModal('modalInputItem Baru');
+        }
+
+        // Dynamic Multi-row Input Penerimaan
+        function addPenerimaanRow() {
+            const container = document.getElementById('penerimaanItemsContainer');
+            const rowId = Date.now();
+            const rowHtml = `
+                <div class="penerimaan-row flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200" id="row-${rowId}">
+                    <input type="text" placeholder="Kode Item / Nama" class="row-kode w-1/2 px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none">
+                    <input type="number" min="1" value="1" placeholder="Qty" class="row-qty w-1/4 px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none">
+                    <button type="button" onclick="document.getElementById('row-${rowId}').remove()" class="text-rose-500 hover:text-rose-700 p-1.5 text-xs"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHtml);
+        }
+
+        // Dynamic Multi-row Input Pemakaian
+        function addPemakaianRow() {
+            const container = document.getElementById('pemakaianItemsContainer');
+            const rowId = Date.now();
+            const rowHtml = `
+                <div class="pemakaian-row flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200" id="row-pem-${rowId}">
+                    <input type="text" placeholder="Kode Item / Nama" class="row-kode w-1/2 px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none">
+                    <input type="number" min="1" value="1" placeholder="Qty" class="row-qty w-1/4 px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none">
+                    <button type="button" onclick="document.getElementById('row-pem-${rowId}').remove()" class="text-rose-500 hover:text-rose-700 p-1.5 text-xs"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHtml);
+        }
     </script>
 </body>
 </html>
